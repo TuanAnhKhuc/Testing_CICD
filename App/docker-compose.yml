@@ -1,0 +1,47 @@
+services:
+  # Dịch vụ Backend API
+  apiservice:
+    build:
+      context: .
+      dockerfile: src/TodojsAspire.ApiService/Dockerfile
+    container_name: todo_api
+    ports:
+      - "8081:8080"
+    environment:
+      - ConnectionStrings__db=Host=postgres_db;Database=tododb;Username=user;Password=password
+    depends_on:
+      postgres_db:
+        condition: service_healthy # <<< THÊM DÒNG NÀY
+
+  # Dịch vụ Frontend
+  frontend:
+    build:
+      context: src/todo-frontend
+      dockerfile: Dockerfile
+    container_name: todo_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - apiservice
+
+  # Dịch vụ PostgreSQL
+  postgres_db:
+    image: postgres
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: tododb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # Giữ nguyên cổng bạn đã đổi
+    healthcheck: # <<< THÊM TOÀN BỘ KHỐI NÀY
+      test: ["CMD-SHELL", "pg_isready -U user -d tododb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# Định nghĩa volume để lưu dữ liệu PostgreSQL
+volumes:
+  postgres_data:
