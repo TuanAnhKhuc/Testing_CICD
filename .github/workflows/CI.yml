@@ -1,4 +1,4 @@
-name: Build and Push Docker Images with Commit Hash
+name: Build and Push Docker Images (Simple Tagging)
 
 on:
   push:
@@ -43,14 +43,8 @@ jobs:
           context: ./App
           file: ./App/src/TodojsAspire.ApiService/Dockerfile
           push: true
-          # Gắn 3 loại tag:
-          # 1. Theo môi trường và commit: your-username/todo-api:dev-a1b2c3d
-          # 2. Chỉ theo môi trường: your-username/todo-api:dev
-          # 3. Thêm tag 'latest' nếu là nhánh main
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}
-            ${{ github.ref == 'refs/heads/main' && format('{0}/{1}:latest', env.DOCKERHUB_USERNAME, env.BACKEND_REPO_NAME) || '' }}
+          # Chỉ gắn một tag duy nhất: your-username/todo-api:dev-a1b2c3d
+          tags: ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
 
       - name: Build and push Frontend Docker image
         uses: docker/build-push-action@v4
@@ -58,8 +52,5 @@ jobs:
           context: ./App/src/todo-frontend
           file: ./App/src/todo-frontend/Dockerfile
           push: true
-          # Gắn 3 loại tag tương tự cho frontend
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}
-            ${{ github.ref == 'refs/heads/main' && format('{0}/{1}:latest', env.DOCKERHUB_USERNAME, env.FRONTEND_REPO_NAME) || '' }}
+          # Chỉ gắn một tag duy nhất: your-username/todo-frontend:dev-a1b2c3d
+          tags: ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
