@@ -3,7 +3,7 @@ name: Build and Push Docker Images by Environment
 on:
   push:
     branches:
-      - DEV  # Môi trường Development
+      - dev  # Môi trường Development
       - main # Môi trường Production
 
 env:
