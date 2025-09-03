@@ -1,4 +1,4 @@
-name: Build and Push Docker Images to Docker Hub
+name: Build and Push Docker Images with Commit Hash
 
 on:
   push:
@@ -9,7 +9,6 @@ on:
 env:
   # Thay thế 'your-dockerhub-username' bằng tên người dùng Docker Hub của bạn
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  # Đặt tên repo cố định cho frontend và backend
   FRONTEND_REPO_NAME: todo-frontend
   BACKEND_REPO_NAME: todo-api
 
@@ -22,10 +21,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Lấy tên nhánh (ví dụ: dev, main) để làm tag cho image
-      - name: Set environment tag
+      # Lấy các biến cần thiết: tên nhánh và mã hash ngắn của commit
+      - name: Set reusable variables
         id: vars
-        run: echo "tag=${GITHUB_REF_NAME,,}" >> $GITHUB_OUTPUT
+        run: |
+          echo "tag_env=${GITHUB_REF_NAME,,}" >> $GITHUB_OUTPUT
+          echo "tag_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -42,9 +43,13 @@ jobs:
           context: ./App
           file: ./App/src/TodojsAspire.ApiService/Dockerfile
           push: true
-          # Tên image sẽ là: your-username/todo-api:dev
+          # Gắn 3 loại tag:
+          # 1. Theo môi trường và commit: your-username/todo-api:dev-a1b2c3d
+          # 2. Chỉ theo môi trường: your-username/todo-api:dev
+          # 3. Thêm tag 'latest' nếu là nhánh main
           tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag }}
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}
             ${{ github.ref == 'refs/heads/main' && format('{0}/{1}:latest', env.DOCKERHUB_USERNAME, env.BACKEND_REPO_NAME) || '' }}
 
       - name: Build and push Frontend Docker image
@@ -53,7 +58,8 @@ jobs:
           context: ./App/src/todo-frontend
           file: ./App/src/todo-frontend/Dockerfile
           push: true
-          # Tên image sẽ là: your-username/todo-frontend:dev
+          # Gắn 3 loại tag tương tự cho frontend
           tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag }}
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}
             ${{ github.ref == 'refs/heads/main' && format('{0}/{1}:latest', env.DOCKERHUB_USERNAME, env.FRONTEND_REPO_NAME) || '' }}
