@@ -38,8 +38,10 @@ resource "aws_db_subnet_group" "this" {
 resource "random_password" "db" {
   length  = 20
   special = true
-  # Exclude '/', '@', '"', and space per RDS password rules
-  override_special = "!#$%^&*()-_=+[]{}<>:;,.?|"
+  # Exclude characters that break connection strings and those not allowed
+  # - Exclude '/', '@', '"', and space (per RDS rules / to avoid issues)
+  # - Exclude ';' and '=' to keep "key=value;" connection strings valid
+  override_special = "!#$%^&*()-_+[]{}<>:,.?|"
 }
 
 resource "aws_db_instance" "postgres" {
@@ -70,5 +72,7 @@ resource "aws_secretsmanager_secret" "db" {
 
 resource "aws_secretsmanager_secret_version" "db" {
   secret_id     = aws_secretsmanager_secret.db.id
-  secret_string = "Host=${aws_db_instance.postgres.address};Database=${var.db_name};Username=${var.db_username};Password=${random_password.db.result}"
+  secret_string = jsonencode({
+    ConnectionString = "Host=${aws_db_instance.postgres.address};Database=${var.db_name};Username=${var.db_username};Password=${random_password.db.result}"
+  })
 }

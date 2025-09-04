@@ -88,8 +88,9 @@ resource "aws_ecs_task_definition" "backend" {
       secrets      = var.backend_db_secret_arn != "" ? [
         {
           name      = "ConnectionStrings__db"
-          valueFrom = var.backend_db_secret_arn
+          valueFrom = "${var.backend_db_secret_arn}:ConnectionString::"
         }
+        
       ] : []
       logConfiguration = {
         logDriver = "awslogs"
