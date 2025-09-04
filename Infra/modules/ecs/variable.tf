@@ -88,3 +88,9 @@ variable "backend_db_secret_arn" {
   description = "Secrets Manager ARN storing DB connection string"
   default     = ""
 }
+
+variable "log_retention_days" {
+  type        = number
+  description = "CloudWatch Logs retention in days"
+  default     = 7
+}

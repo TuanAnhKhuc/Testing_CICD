@@ -7,6 +7,21 @@ resource "aws_ecs_cluster" "this" {
   tags = var.tags
 }
 
+data "aws_region" "current" {}
+
+# CloudWatch Log Groups for containers
+resource "aws_cloudwatch_log_group" "frontend" {
+  name              = "/ecs/${var.tags["Project"]}-frontend"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "backend" {
+  name              = "/ecs/${var.tags["Project"]}-backend"
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
+}
+
 # Frontend task definition
 resource "aws_ecs_task_definition" "frontend" {
   family                   = "${var.tags["Project"]}-frontend"
@@ -22,6 +37,14 @@ resource "aws_ecs_task_definition" "frontend" {
       image        = var.frontend_image
       essential    = true
       portMappings = [{ containerPort = var.frontend_container_port, hostPort = var.frontend_container_port }]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.frontend.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     }
   ])
 }
@@ -68,6 +91,14 @@ resource "aws_ecs_task_definition" "backend" {
           valueFrom = var.backend_db_secret_arn
         }
       ] : []
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.backend.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     }
   ])
 }
@@ -91,5 +122,4 @@ resource "aws_ecs_service" "backend" {
     container_port   = var.backend_container_port
   }
 }
-
 

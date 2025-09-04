@@ -38,12 +38,13 @@ resource "aws_db_subnet_group" "this" {
 resource "random_password" "db" {
   length  = 20
   special = true
+  # Exclude '/', '@', '"', and space per RDS password rules
+  override_special = "!#$%^&*()-_=+[]{}<>:;,.?|"
 }
 
 resource "aws_db_instance" "postgres" {
   identifier                = "${var.tags["Project"]}-postgres"
   engine                    = "postgres"
-  engine_version            = var.engine_version
   instance_class            = var.db_instance_class
   allocated_storage         = var.allocated_storage
   db_name                   = var.db_name

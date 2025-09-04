@@ -18,20 +18,14 @@ module "security" {
   tags   = module.tagging.tags
 }
 
-# ACM certificate via Route53 DNS validation (requires Route53 zone)
-module "acm" {
-  source         = "./modules/acm"
-  domain_name    = var.domain_name
-  hosted_zone_id = var.hosted_zone_id
-  tags           = module.tagging.tags
-}
 
 module "alb" {
   source         = "./modules/alb"
   vpc_id         = module.vpc.vpc_id
   public_subnets = module.vpc.public_subnet_ids
   sg_id          = module.security.sg_alb_id
-  certificate_arn = module.acm.certificate_arn
+  enable_https    = var.enable_https
+  certificate_arn = ""
   tags           = module.tagging.tags
 }
 
@@ -84,17 +78,7 @@ module "db" {
 }
 
 # Route53 alias for ALB (optional, only when domain and zone provided)
-resource "aws_route53_record" "alb_alias" {
-  count   = var.domain_name != "" && var.hosted_zone_id != "" ? 1 : 0
-  zone_id = var.hosted_zone_id
-  name    = var.domain_name
-  type    = "A"
-  alias {
-    name                   = module.alb.alb_dns
-    zone_id                = module.alb.alb_zone_id
-    evaluate_target_health = true
-  }
-}
+
 
 # Attach Secrets Manager read policy to the ECS execution role (deterministic ARN)
 data "aws_caller_identity" "current" {}

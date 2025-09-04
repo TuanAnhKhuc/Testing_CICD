@@ -33,16 +33,10 @@ variable "db_subnet_cidrs" {
   default     = []
 }
 
-variable "domain_name" {
-  type        = string
-  description = "Domain for ACM/ALB"
-  default     = ""
-}
-
-variable "hosted_zone_id" {
-  type        = string
-  description = "Route53 hosted zone ID"
-  default     = ""
+variable "enable_https" {
+  type        = bool
+  description = "Enable HTTPS via ACM + Route53"
+  default     = false
 }
 
 variable "frontend_image" {
