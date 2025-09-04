@@ -70,7 +70,5 @@ resource "aws_secretsmanager_secret" "db" {
 
 resource "aws_secretsmanager_secret_version" "db" {
   secret_id     = aws_secretsmanager_secret.db.id
-  secret_string = jsonencode({
-    ConnectionString = "Host=${aws_db_instance.postgres.address};Database=${var.db_name};Username=${var.db_username};Password=${random_password.db.result}"
-  })
+  secret_string = "Host=${aws_db_instance.postgres.address};Database=${var.db_name};Username=${var.db_username};Password=${random_password.db.result}"
 }
