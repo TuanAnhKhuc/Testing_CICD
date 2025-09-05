@@ -36,6 +36,7 @@ module "iam" {
 }
 
 module "ecs" {
+  count                     = var.run_on == "ecs" ? 1 : 0
   source                    = "./modules/ecs"
   vpc_id                    = module.vpc.vpc_id
   subnets                   = module.vpc.private_subnet_ids
@@ -59,9 +60,26 @@ module "ecs" {
   backend_db_secret_arn     = try(module.db.db_secret_arn, "")
 }
 
+# EC2-based deployment (self-host containers)
+module "ec2" {
+  count                      = var.run_on == "ec2" ? 1 : 0
+  source                     = "./modules/ec2"
+  subnet_id                  = module.vpc.private_subnet_ids[0]
+  sg_id                      = module.security.sg_app_id
+  tags                       = module.tagging.tags
+  instance_type              = "t3.micro"
+  frontend_image             = var.frontend_image
+  backend_image              = var.backend_image
+  backend_db_secret_arn      = try(module.db.db_secret_arn, "")
+  frontend_target_group_arn  = module.alb.frontend_tg_arn
+  backend_target_group_arn   = module.alb.backend_tg_arn
+}
+
 # RDS PostgreSQL + Secret
 module "db" {
   source               = "./modules/db"
+  project              = var.name_prefix
+  env    =                var.env
   vpc_id               = module.vpc.vpc_id
   db_subnet_ids        = module.vpc.db_subnet_ids
   app_sg_id            = module.security.sg_app_id
@@ -94,6 +112,7 @@ data "aws_iam_policy_document" "secrets_read_root" {
 }
 
 resource "aws_iam_role_policy" "ecs_exec_secrets_read" {
+  count  = var.run_on == "ecs" ? 1 : 0
   name   = "secrets-read"
   role   = module.iam.ecs_task_execution_role_name
   policy = data.aws_iam_policy_document.secrets_read_root.json

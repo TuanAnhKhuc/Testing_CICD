@@ -66,7 +66,7 @@ resource "aws_db_instance" "postgres" {
 }
 
 resource "aws_secretsmanager_secret" "db" {
-  name = "${var.tags["Project"]}-db-conn"
+  name = "${var.project}-db-secret-${var.env}"
   tags = var.tags
 }
 

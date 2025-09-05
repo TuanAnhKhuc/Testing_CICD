@@ -109,3 +109,23 @@ variable "deletion_protection" {
   description = "Enable deletion protection"
   default     = false
 }
+
+variable "project" {
+  description = "Project name for resource naming"
+  type        = string
+}
+variable "env" {
+  description = "Environment name (e.g., dev, prod)"
+  type        = string
+}
+
+# Deployment mode: "ecs" (default) or "ec2"
+variable "run_on" {
+  description = "Choose deployment runtime: ecs or ec2"
+  type        = string
+  default     = "ecs"
+  validation {
+    condition     = contains(["ecs", "ec2"], var.run_on)
+    error_message = "run_on must be either 'ecs' or 'ec2'"
+  }
+}

@@ -63,3 +63,13 @@ variable "tags" {
   type        = map(string)
   description = "Tags to apply"
 }
+
+variable "project" {
+  description = "Project name for resource naming"
+  type        = string
+}
+
+variable "env" {
+  description = "Environment name (e.g., dev, prod)"
+  type        = string
+}

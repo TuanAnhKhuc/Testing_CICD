@@ -1,4 +1,4 @@
-name: Build and Push Docker Images (Simple Tagging)
+name: CI - Build and Push Docker Images
 
 on:
   push:
@@ -7,26 +7,35 @@ on:
       - main
 
 env:
-  # Thay thế 'your-dockerhub-username' bằng tên người dùng Docker Hub của bạn
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   FRONTEND_REPO_NAME: todo-frontend
   BACKEND_REPO_NAME: todo-api
 
 jobs:
   build-and-push:
-    name: Build and Push to Docker Hub
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Lấy các biến cần thiết: tên nhánh và mã hash ngắn của commit
       - name: Set reusable variables
         id: vars
         run: |
           echo "tag_env=${GITHUB_REF_NAME,,}" >> $GITHUB_OUTPUT
           echo "tag_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Cache .NET dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: dotnet-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -37,14 +46,28 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Build and test Backend
+        run: |
+          cd App/src/TodojsAspire.ApiService
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+          dotnet test --no-build --verbosity normal
+
+      - name: Build Frontend (test build)
+        run: |
+          cd App/src/todo-frontend
+          npm ci
+          npm run build
+
       - name: Build and push Backend Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./App
           file: ./App/src/TodojsAspire.ApiService/Dockerfile
           push: true
-          # Chỉ gắn một tag duy nhất: your-username/todo-api:dev-a1b2c3d
-          tags: ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.BACKEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-latest
 
       - name: Build and push Frontend Docker image
         uses: docker/build-push-action@v4
@@ -52,5 +75,6 @@ jobs:
           context: ./App/src/todo-frontend
           file: ./App/src/todo-frontend/Dockerfile
           push: true
-          # Chỉ gắn một tag duy nhất: your-username/todo-frontend:dev-a1b2c3d
-          tags: ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-${{ steps.vars.outputs.tag_sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/${{ env.FRONTEND_REPO_NAME }}:${{ steps.vars.outputs.tag_env }}-latest
