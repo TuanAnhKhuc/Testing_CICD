@@ -1,126 +1,107 @@
-locals {
-  execution_role_arn = var.execution_role_arn
-}
-
 resource "aws_ecs_cluster" "this" {
-  name = "${var.tags["Project"]}-cluster"
-  tags = var.tags
+  name = var.ecs_cluster_name
 }
 
-data "aws_region" "current" {}
+data "aws_iam_policy_document" "ecs_task_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
 
-# CloudWatch Log Groups for containers
-resource "aws_cloudwatch_log_group" "frontend" {
-  name              = "/ecs/${var.tags["Project"]}-frontend"
+resource "aws_iam_role" "task_exec" {
+  name               = "${var.environment}-ecs-task-exec-role"
+  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "task_exec_policy" {
+  role       = aws_iam_role.task_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy" "cloudmap_access" {
+  name   = "${var.environment}-cloudmap-access"
+  role   = aws_iam_role.task_exec.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = [
+        "servicediscovery:RegisterInstance",
+        "servicediscovery:DeregisterInstance",
+        "servicediscovery:DiscoverInstances"
+      ]
+      Resource  = "*"
+    }]
+  })
+}
+
+resource "aws_cloudwatch_log_group" "services" {
+  for_each          = { for svc in var.services : svc.name => svc }
+  name              = "/ecs/${var.environment}/${each.value.name}"
   retention_in_days = var.log_retention_days
-  tags              = var.tags
+  tags              = { Name = "${var.environment}-${each.value.name}-logs" }
 }
 
-resource "aws_cloudwatch_log_group" "backend" {
-  name              = "/ecs/${var.tags["Project"]}-backend"
-  retention_in_days = var.log_retention_days
-  tags              = var.tags
-}
-
-# Frontend task definition
-resource "aws_ecs_task_definition" "frontend" {
-  family                   = "${var.tags["Project"]}-frontend"
+resource "aws_ecs_task_definition" "services" {
+  for_each                 = { for svc in var.services : svc.name => svc }
+  family                   = "${var.environment}-${each.value.name}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
-  execution_role_arn       = local.execution_role_arn
+  cpu                      = each.value.cpu
+  memory                   = each.value.memory
+  execution_role_arn       = aws_iam_role.task_exec.arn
 
-  container_definitions = jsonencode([
-    {
-      name         = var.frontend_container_name
-      image        = var.frontend_image
-      essential    = true
-      portMappings = [{ containerPort = var.frontend_container_port, hostPort = var.frontend_container_port }]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.frontend.name
-          awslogs-region        = data.aws_region.current.name
-          awslogs-stream-prefix = "ecs"
-        }
+  container_definitions = jsonencode([{
+    name  = each.value.name
+    image = "${each.value.image}:${each.value.image_tag}"
+    portMappings = each.value.port_mappings
+    environment  = each.value.environment
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = "/ecs/${var.environment}/${each.value.name}"
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = "ecs"
       }
     }
-  ])
+  }])
 }
 
-resource "aws_ecs_service" "frontend" {
-  name            = "${var.tags["Project"]}-frontend"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = var.frontend_desired_count
-  launch_type     = "FARGATE"
-
+resource "aws_ecs_service" "services" {
+  for_each         = { for svc in var.services : svc.name => svc }
+  name             = "${var.environment}-${each.value.name}-svc"
+  cluster          = aws_ecs_cluster.this.id
+  task_definition  = aws_ecs_task_definition.services[each.key].arn
+  desired_count    = each.value.desired_count
+  launch_type      = "FARGATE"
+  health_check_grace_period_seconds = 60
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
   network_configuration {
-    subnets          = var.subnets
-    security_groups  = [var.sg_id]
+    subnets          = var.private_subnet_ids
+    security_groups  = each.value.security_groups
     assign_public_ip = false
   }
-
-  load_balancer {
-    target_group_arn = var.frontend_target_group_arn
-    container_name   = var.frontend_container_name
-    container_port   = var.frontend_container_port
-  }
-}
-
-# Backend task definition
-resource "aws_ecs_task_definition" "backend" {
-  family                   = "${var.tags["Project"]}-backend"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
-  execution_role_arn       = local.execution_role_arn
-
-  container_definitions = jsonencode([
-    {
-      name         = var.backend_container_name
-      image        = var.backend_image
-      essential    = true
-      portMappings = [{ containerPort = var.backend_container_port, hostPort = var.backend_container_port }]
-      environment  = []
-      secrets      = var.backend_db_secret_arn != "" ? [
-        {
-          name      = "ConnectionStrings__db"
-          valueFrom = "${var.backend_db_secret_arn}:ConnectionString::"
-        }
-        
-      ] : []
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.backend.name
-          awslogs-region        = data.aws_region.current.name
-          awslogs-stream-prefix = "ecs"
-        }
-      }
+  dynamic "service_registries" {
+    for_each = each.value.service_discovery_arn != "" ? [1] : []
+    content {
+      registry_arn = each.value.service_discovery_arn
     }
-  ])
-}
-
-resource "aws_ecs_service" "backend" {
-  name            = "${var.tags["Project"]}-backend"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.backend.arn
-  desired_count   = var.backend_desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = var.subnets
-    security_groups  = [var.sg_id]
-    assign_public_ip = false
   }
-
-  load_balancer {
-    target_group_arn = var.backend_target_group_arn
-    container_name   = var.backend_container_name
-    container_port   = var.backend_container_port
+  dynamic "load_balancer" {
+    for_each = each.value.target_group_arn != "" ? [1] : []
+    content {
+      target_group_arn = each.value.target_group_arn
+      container_name   = each.value.name
+      container_port   = each.value.port_mappings[0].containerPort
+    }
   }
+  force_new_deployment = true
 }
-

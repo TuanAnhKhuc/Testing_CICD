@@ -1,0 +1,8 @@
+##############################################
+# VPC module variables - variables.tf        #
+##############################################
+
+variable "environment" { type = string }
+variable "vpc_cidr" { type = string }
+variable "public_subnet_cidrs" { type = list(string) }
+variable "private_subnet_cidrs" { type = list(string) }

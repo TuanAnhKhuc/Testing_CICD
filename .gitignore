@@ -23,3 +23,11 @@ Icon[]
 Network Trash Folder
 Temporary Items
 .apdisk
+
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+.terraform.tfstate.lock.info
