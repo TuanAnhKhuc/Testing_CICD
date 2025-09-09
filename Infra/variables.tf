@@ -1,49 +1,116 @@
-##############################################
-# Root variables - variables.tf              #
-##############################################
+variable "aws_region" {
+  description = "Mã vùng AWS"
+  type        = string
+}
 
-variable "aws_region" { type = string }
-variable "environment" { type = string }
+variable "environment" {
+  description = "Prefix cho tên resource"
+  type        = string
+}
 
-# Networking
-variable "vpc_cidr" { type = string }
-variable "public_subnet_cidrs" { type = list(string) }
-variable "private_subnet_cidrs" { type = list(string) }
+variable "vpc_cidr" {
+  description = "CIDR block cho VPC"
+  type        = string
+}
 
-# Database
-variable "db_name" { type = string }
-variable "db_username" { type = string }
+variable "public_subnet_cidrs" {
+  description = "Danh sách CIDR public subnet"
+  type        = list(string)
+}
+
+variable "private_subnet_cidrs" {
+  description = "Danh sách CIDR private subnet"
+  type        = list(string)
+}
+
+variable "db_name" {
+  description = "Tên database khởi tạo"
+  type        = string 
+}
+variable "db_username" {
+  description = "Username master cho RDS"
+  type        = string
+}
+
 variable "db_password" {
-  type      = string
-  sensitive = true
+  description = "Password master cho RDS"
+  type        = string
+  sensitive   = true
 }
-variable "db_allocated_storage" { type = number }
-variable "db_instance_class"   { type = string }
 
-# ECS
-variable "ecs_cluster_name" { type = string }
-variable "backend_cpu"      { type = number }
-variable "backend_memory"   { type = number }
-variable "frontend_cpu"     { type = number }
-variable "frontend_memory"  { type = number }
-variable "backend_image"    { type = string }
-variable "frontend_image"   { type = string }
-variable "backend_image_tag"  { type = string }
-variable "frontend_image_tag" { type = string }
-variable "frontend_desired_count" { type = number }
-variable "backend_desired_count"  { type = number }
-
-# Observability
-variable "log_retention_days" {
-  description = "CloudWatch Logs retention in days"
+variable "db_allocated_storage" {
+  description = "Dung lượng (GB) cho RDS"
   type        = number
-  default     = 7
 }
 
-# DNS / TLS
-variable "root_domain_name" { type = string }
-variable "subdomain"        { type = string }
+variable "db_instance_class" {
+  description = "Instance class cho RDS"
+  type        = string
+  default     = "db.t3.micro"
+}
 
-# Modules passthrough
-variable "service_discovery_services" { type = any }
-variable "alb_target_groups"         { type = any }
+variable "ecs_cluster_name" {
+  description = "Tên ECS Cluster"
+  type        = string
+}
+
+variable "backend_cpu" {
+  description = "vCPU cho backend task"
+  type        = number
+}
+
+variable "backend_memory" {
+  description = "Memory (MB) cho backend task"
+  type        = number
+}
+
+variable "frontend_cpu" {
+  description = "vCPU cho frontend task"
+  type        = number
+}
+
+variable "frontend_memory" {
+  description = "Memory (MB) cho frontend task"
+  type        = number
+}
+
+variable "backend_image" {
+  description = "Docker Hub repo cho backend (không kèm tag)"
+  type        = string
+}
+
+variable "frontend_image" {
+  description = "Docker Hub repo cho frontend (không kèm tag)"
+  type        = string
+}
+
+variable "backend_image_tag" {
+  description = "Tag image backend"
+  type        = string
+}
+
+variable "frontend_image_tag" {
+  description = "Tag image frontend"
+  type        = string
+}
+
+variable "root_domain_name" {
+  description = "Tên miền gốc đã đăng ký trên Route 53, ví dụ myapp.xyz"
+  type        = string
+}
+
+variable "subdomain" {
+  description = "Tiền tố subdomain, ví dụ app → app.myapp.xyz"
+  type        = string
+  default     = "app"
+}
+
+variable "frontend_desired_count" {
+  description = "Số lượng task chạy đồng thời cho frontend"
+  type        = number
+}
+
+variable "backend_desired_count" {
+  description = "Số lượng task chạy đồng thời cho backend"
+  type        = number
+}
