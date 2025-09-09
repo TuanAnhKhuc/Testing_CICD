@@ -105,9 +105,7 @@ data "aws_region" "current" {}
 data "aws_iam_policy_document" "secrets_read_root" {
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [
-      "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${var.name_prefix}-db-conn*"
-    ]
+    resources = [module.db.db_secret_arn]
   }
 }
 
