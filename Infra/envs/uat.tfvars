@@ -1,5 +1,5 @@
 # ====== ENV / REGION ======
-environment       = "dev"
+environment       = "uat"
 aws_region        = "ap-northeast-1"
 
 # ====== DNS / CERT (Route53 hosted zone phải tồn tại trước) ======
@@ -26,10 +26,10 @@ db_instance_class    = "db.t4g.micro"     # rẻ để test; có thể đổi db
 db_allocated_storage = 20                 # GB
 db_name              = "appdb"
 db_username          = "appuser"
-db_password          = "pass12345678"   # nên dùng TF_VAR_db_password hoặc tfvars riêng tư
+# db_password        = (đưa vào GitHub Secrets và truyền qua -var)
 
 # ====== ECS / CLUSTER ======
-ecs_cluster_name = "dev-ecs-cluster"
+ecs_cluster_name = "uat-ecs-cluster"
 
 # Backend task sizing
 backend_cpu            = "256"
@@ -45,7 +45,7 @@ frontend_desired_count = 1
 # Với ECR private: "<account_id>.dkr.ecr.ap-northeast-1.amazonaws.com/<repo>"
 # Với Docker Hub:  "<username>/<repo>"
 backend_image      = "tuananh2410/backend"
-backend_image_tag  = "dev-latest"
+backend_image_tag  = "uat-latest"
 
 frontend_image     = "tuananh2410/frontend"
-frontend_image_tag = "dev-latest"
+frontend_image_tag = "uat-latest"
