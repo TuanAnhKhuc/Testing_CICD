@@ -1,7 +1,3 @@
-##############################################
-# Terraform + AWS provider - be.tf           #
-##############################################
-
 terraform {
   required_version = ">= 1.1.0"
 
@@ -12,12 +8,11 @@ terraform {
     }
   }
 
-  # Local state for now (S3 backend can be enabled later)
-  # backend "s3" {}
+
 }
 
 # Use fixed region and profile as requested
 provider "aws" {
-  region  = var.aws_region       # e.g., ap-northeast-1
+  region  = var.aws_region      
   profile = "AnhKT4"            # AWS profile configured locally
 }
