@@ -1,0 +1,87 @@
+name: CD - Terraform Deploy
+
+on:
+  push:
+    branches: [ dev, uat, main ]
+    paths:
+      - 'Infra/**'
+      - '.github/workflows/CD.yml'
+  workflow_dispatch:
+
+env:
+  AWS_PROFILE_NAME: AnhKT4
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Map branch -> environment for environment-scoped secrets
+    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'uat' && 'uat' || 'dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Terraform environment from branch
+        id: setenv
+        shell: bash
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            dev)  echo "TF_ENV=dev"  >> "$GITHUB_ENV" ;;
+            uat)  echo "TF_ENV=uat"  >> "$GITHUB_ENV" ;;
+            main) echo "TF_ENV=prod" >> "$GITHUB_ENV" ;;
+            *)    echo "Unsupported branch: ${GITHUB_REF_NAME}"; exit 1 ;;
+          esac
+          echo "Selected TF_ENV=$TF_ENV"
+
+      - name: Configure AWS credentials profile (AnhKT4)
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION:            ${{ secrets.AWS_REGION }}
+        run: |
+          mkdir -p ~/.aws
+          {
+            echo "[${{ env.AWS_PROFILE_NAME }}]"
+            echo "aws_access_key_id=${AWS_ACCESS_KEY_ID}"
+            echo "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}"
+            echo "region=${AWS_REGION}"
+          } > ~/.aws/credentials
+          aws sts get-caller-identity || true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Init (S3 backend)
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        run: terraform init -reconfigure
+
+      - name: Select/Create workspace
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        run: |
+          terraform workspace list | grep -q " ${TF_ENV}$" \
+            || terraform workspace new "${TF_ENV}"
+          terraform workspace select "${TF_ENV}"
+
+      - name: Terraform Apply
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        run: |
+          terraform apply \
+            -auto-approve \
+            -var-file="envs/${TF_ENV}.tfvars" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}"
+
+      - name: Show outputs (ALB / App URL)
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        run: terraform output -json
+
