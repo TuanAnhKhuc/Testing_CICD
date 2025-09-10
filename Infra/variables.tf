@@ -114,3 +114,9 @@ variable "backend_desired_count" {
   description = "Số lượng task chạy đồng thời cho backend"
   type        = number
 }
+
+variable "common_tags" {
+  description = "Common tags to apply to resources"
+  type        = map(string)
+  default     = {}
+}

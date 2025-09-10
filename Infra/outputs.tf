@@ -1,6 +1,6 @@
 output "alb_dns_name" {
   description = "DNS name của ALB"
-  value       = aws_lb.app.dns_name
+  value       = module.alb.alb_dns_name
 }
 
 output "app_url" {
@@ -10,5 +10,5 @@ output "app_url" {
 
 output "rds_endpoint" {
   description = "Endpoint của RDS MySQL"
-  value       = aws_db_instance.mysql.address
+  value       = module.rds.db_endpoint
 }
