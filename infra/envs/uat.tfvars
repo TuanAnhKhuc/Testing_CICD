@@ -1,6 +1,6 @@
 # ====== ENV / REGION ======
 environment       = "uat"
-aws_region        = "ap-northeast-1"
+aws_region        = "ap-northeast-2"
 
 # ====== DNS / CERT (Route53 hosted zone phải tồn tại trước) ======
 root_domain_name  = "tudaolw.io.vn"   # ví dụ: "anhkt4.online"
