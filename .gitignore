@@ -31,3 +31,9 @@ terraform.tfstate.*
 *.tfstate.*
 .terraform.lock.hcl
 .terraform.tfstate.lock.info
+*.tfvars
+*.tfvars.json
+
+# local files
+terraform.tfvars
+terraform.tfvars.json
