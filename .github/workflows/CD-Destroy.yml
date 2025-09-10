@@ -1,0 +1,95 @@
+name: CD - Terraform Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment to destroy (dev/uat/prod)"
+        type: choice
+        required: true
+        options:
+          - dev
+          - uat
+          - prod
+        default: dev
+      confirm:
+        description: "Type DESTROY to confirm irreversible deletion"
+        type: string
+        required: true
+
+env:
+  AWS_PROFILE_NAME: AnhKT4
+
+jobs:
+  destroy:
+    # Guard: only proceed when user types DESTROY exactly
+    if: ${{ inputs.confirm == 'DESTROY' }}
+    runs-on: ubuntu-latest
+    # Use environment-scoped secrets (DB_PASSWORD, AWS_*) per env
+    environment: ${{ inputs.env }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set TF_ENV
+        run: echo "TF_ENV=${{ inputs.env }}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials profile (AnhKT4)
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION:            ${{ secrets.AWS_REGION }}
+        run: |
+          mkdir -p ~/.aws
+          {
+            echo "[${{ env.AWS_PROFILE_NAME }}]"
+            echo "aws_access_key_id=${AWS_ACCESS_KEY_ID}"
+            echo "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}"
+            echo "region=${AWS_REGION}"
+          } > ~/.aws/credentials
+          aws sts get-caller-identity || true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Init backend
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        run: terraform init -reconfigure
+
+      - name: Select workspace if exists
+        id: select_ws
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        shell: bash
+        run: |
+          if terraform workspace list | grep -q " ${TF_ENV}$"; then
+            terraform workspace select "${TF_ENV}"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Workspace ${TF_ENV} not found. Nothing to destroy." | tee /tmp/msg
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Destroy
+        if: steps.select_ws.outputs.exists == 'true'
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        run: |
+          terraform destroy \
+            -auto-approve \
+            -var-file="envs/${TF_ENV}.tfvars" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}"
+
+      - name: Outcome when workspace missing
+        if: steps.select_ws.outputs.exists != 'true'
+        run: |
+          echo "Skip: ${TF_ENV} has no Terraform state/workspace."
+#
