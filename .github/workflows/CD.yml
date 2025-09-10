@@ -74,10 +74,11 @@ jobs:
         env:
           AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
         run: |
-          terraform apply \
-            -auto-approve \
-            -var-file="envs/${TF_ENV}.tfvars" \
-            -var="db_password=${{ secrets.DB_PASSWORD }}"
+           CLEAN_DB_PASS=$(echo "${{ secrets.DB_PASSWORD }}" | tr -d '\n' | tr -d '\r')
+            terraform apply \
+              -auto-approve \
+              -var-file="envs/${TF_ENV}.tfvars" \
+              -var="db_password=$CLEAN_DB_PASS"
 
       - name: Show outputs (ALB / App URL)
         working-directory: infra
