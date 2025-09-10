@@ -4,7 +4,7 @@ on:
   push:
     branches: [ dev, uat, main ]
     paths:
-      - 'Infra/**'
+      - 'infra/**'
       - '.github/workflows/CD.yml'
   workflow_dispatch:
 
