@@ -1,20 +1,21 @@
 name: CD - Terraform Deploy
 
 on:
-  push:
-    branches: [ dev, uat, main ]
-    paths:
-      - 'infra/**'
-      - '.github/workflows/CD.yml'
   workflow_dispatch:
 
 env:
   AWS_PROFILE_NAME: AnhKT4
 
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-terraform-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Map branch -> environment for environment-scoped secrets
     environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'uat' && 'uat' || 'dev' }}
 
     steps:
@@ -48,6 +49,7 @@ jobs:
             echo "region=${AWS_REGION}"
           } > ~/.aws/credentials
           aws sts get-caller-identity || true
+          echo "AWS_PROFILE=${{ env.AWS_PROFILE_NAME }}" >> "$GITHUB_ENV"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -65,24 +67,86 @@ jobs:
         env:
           AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
         run: |
-          terraform workspace list | grep -q " ${TF_ENV}$" \
+          terraform workspace list | sed 's/*//g' | awk '{$1=$1};1' | grep -wq "${TF_ENV}" \
             || terraform workspace new "${TF_ENV}"
           terraform workspace select "${TF_ENV}"
 
-      - name: Terraform Apply
+      - name: Prepare secrets/env
+        shell: bash
+        run: |
+          CLEAN_DB_PASS=$(echo "${{ secrets.DB_PASSWORD }}" | tr -d '\n' | tr -d '\r')
+          echo "CLEAN_DB_PASS=$CLEAN_DB_PASS" >> "$GITHUB_ENV"
+
+      # ===== GATE: Terraform Plan with policy checks =====
+      - name: Terraform Plan (gate)
+        id: plan
         working-directory: infra
         env:
           AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        shell: bash
         run: |
-           CLEAN_DB_PASS=$(echo "${{ secrets.DB_PASSWORD }}" | tr -d '\n' | tr -d '\r')
-            terraform apply \
-              -auto-approve \
-              -var-file="envs/${TF_ENV}.tfvars" \
-              -var="db_password=$CLEAN_DB_PASS"
+          set -e
+          # -detailed-exitcode: 0 = no changes, 2 = changes present, 1 = error
+          terraform plan \
+            -no-color \
+            -detailed-exitcode \
+            -out=tfplan \
+            -var-file="envs/${TF_ENV}.tfvars" \
+            -var="db_password=${CLEAN_DB_PASS}" \
+          || ret=$?
+
+          if [ "${ret:-0}" = "1" ]; then
+            echo "Plan failed due to Terraform error."
+            exit 1
+          fi
+
+          # Inspect the human-readable plan for policy checks
+          terraform show -no-color tfplan > plan.txt
+
+          # --- Policy examples (tùy chỉnh theo nhu cầu) ---
+          # 1) Không cho phép 'destroy' ở tất cả môi trường
+          if grep -Eiq 'will be destroyed' plan.txt; then
+            echo "❌ Policy violation: Plan contains resource destruction."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          # 2) Với prod, chặn thay đổi ở các tài nguyên nhạy cảm (ví dụ RDS/ALB)
+          if [ "${TF_ENV}" = "prod" ]; then
+            if grep -Eiq 'aws_db_instance|aws_rds_cluster|aws_lb\b|aws_lb_listener\b|aws_lb_target_group\b' plan.txt; then
+              echo "❌ Policy violation (prod): Changes to RDS/ALB-related resources detected."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          fi
+
+          # 3) (Tuỳ chọn) Chặn giảm kích thước RDS (example pattern)
+          if grep -Eiq '~ instance_class: .*->.*db\.[a-z0-9]+\.' plan.txt; then
+            echo "❌ Policy violation: RDS instance_class change detected."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "✅ Plan passed policy checks."
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload plan artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ env.TF_ENV }}
+          path: infra/plan.txt
+
+      - name: Terraform Apply
+        if: steps.plan.outputs.proceed == 'true'
+        working-directory: infra
+        env:
+          AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
+        run: terraform apply -auto-approve tfplan
 
       - name: Show outputs (ALB / App URL)
+        if: steps.plan.outputs.proceed == 'true'
         working-directory: infra
         env:
           AWS_PROFILE: ${{ env.AWS_PROFILE_NAME }}
         run: terraform output -json
-

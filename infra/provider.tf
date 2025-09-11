@@ -11,7 +11,6 @@ terraform {
 
 }
 
-# Use fixed region and profile as requested
 provider "aws" {
   region  = var.aws_region      
   profile = "AnhKT4"            # AWS profile configured locally
