@@ -127,8 +127,8 @@ jobs:
           #   exit 1
           # fi
 
-          # echo "✅ Plan passed policy checks."
-          # echo "proceed=true" >> "$GITHUB_OUTPUT"
+           echo "✅ Plan passed policy checks."
+           echo "proceed=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload plan artifact
         if: always()
