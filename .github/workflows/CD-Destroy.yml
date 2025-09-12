@@ -10,7 +10,7 @@ on:
         options:
           - dev
           - uat
-          - prod
+          - main
         default: dev
       confirm:
         description: "Type DESTROY to confirm irreversible deletion"
