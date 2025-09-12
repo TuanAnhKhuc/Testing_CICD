@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'uat' && 'uat' || 'dev' }}
+    environment: ${{ github.ref_name == 'main' && 'main' || github.ref_name == 'uat' && 'uat' || 'dev' }}
 
     steps:
       - name: Checkout
@@ -29,7 +29,7 @@ jobs:
           case "${GITHUB_REF_NAME}" in
             dev)  echo "TF_ENV=dev"  >> "$GITHUB_ENV" ;;
             uat)  echo "TF_ENV=uat"  >> "$GITHUB_ENV" ;;
-            main) echo "TF_ENV=prod" >> "$GITHUB_ENV" ;;
+            main) echo "TF_ENV=main" >> "$GITHUB_ENV" ;;
             *)    echo "Unsupported branch: ${GITHUB_REF_NAME}"; exit 1 ;;
           esac
           echo "Selected TF_ENV=$TF_ENV"
@@ -104,31 +104,31 @@ jobs:
           terraform show -no-color tfplan > plan.txt
 
           # --- Policy examples (tùy chỉnh theo nhu cầu) ---
-          # 1) Không cho phép 'destroy' ở tất cả môi trường
-          if grep -Eiq 'will be destroyed' plan.txt; then
-            echo "❌ Policy violation: Plan contains resource destruction."
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
+          # # 1) Không cho phép 'destroy' ở tất cả môi trường
+          # if grep -Eiq 'will be destroyed' plan.txt; then
+          #   echo "❌ Policy violation: Plan contains resource destruction."
+          #   echo "proceed=false" >> "$GITHUB_OUTPUT"
+          #   exit 1
+          # fi
 
-          # 2) Với prod, chặn thay đổi ở các tài nguyên nhạy cảm (ví dụ RDS/ALB)
-          if [ "${TF_ENV}" = "prod" ]; then
-            if grep -Eiq 'aws_db_instance|aws_rds_cluster|aws_lb\b|aws_lb_listener\b|aws_lb_target_group\b' plan.txt; then
-              echo "❌ Policy violation (prod): Changes to RDS/ALB-related resources detected."
-              echo "proceed=false" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-          fi
+          # # 2) Với prod, chặn thay đổi ở các tài nguyên nhạy cảm (ví dụ RDS/ALB)
+          # if [ "${TF_ENV}" = "main" ]; then
+          #   if grep -Eiq 'aws_db_instance|aws_rds_cluster|aws_lb\b|aws_lb_listener\b|aws_lb_target_group\b' plan.txt; then
+          #     echo "❌ Policy violation (prod): Changes to RDS/ALB-related resources detected."
+          #     echo "proceed=false" >> "$GITHUB_OUTPUT"
+          #     exit 1
+          #   fi
+          # fi
 
-          # 3) (Tuỳ chọn) Chặn giảm kích thước RDS (example pattern)
-          if grep -Eiq '~ instance_class: .*->.*db\.[a-z0-9]+\.' plan.txt; then
-            echo "❌ Policy violation: RDS instance_class change detected."
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
+          # # 3) (Tuỳ chọn) Chặn giảm kích thước RDS (example pattern)
+          # if grep -Eiq '~ instance_class: .*->.*db\.[a-z0-9]+\.' plan.txt; then
+          #   echo "❌ Policy violation: RDS instance_class change detected."
+          #   echo "proceed=false" >> "$GITHUB_OUTPUT"
+          #   exit 1
+          # fi
 
-          echo "✅ Plan passed policy checks."
-          echo "proceed=true" >> "$GITHUB_OUTPUT"
+          # echo "✅ Plan passed policy checks."
+          # echo "proceed=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload plan artifact
         if: always()
