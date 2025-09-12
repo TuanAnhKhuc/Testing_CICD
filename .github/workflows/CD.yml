@@ -62,7 +62,7 @@ jobs:
       - name: Terraform Plan
         working-directory: infra
         run: |
-          CLEAN_DB_PASS=$(echo "${{ secrets.DB_PASSWORD }}" | tr -d '\n' | tr -d '\r')
+          CLEAN_DB_PASS=$(printf "%s" "${{ secrets.DB_PASSWORD }}" | tr -d '\n' | tr -d '\r')
           terraform plan \
             -no-color \
             -var-file="envs/${{ steps.setenv.outputs.tf_env }}.tfvars" \
@@ -109,4 +109,11 @@ jobs:
       - name: Terraform Apply
         working-directory: infra
         run: |
-          CLEAN_DB_PASS=$(echo "${{ secrets.DB_PASSWORD }}" | tr -d '_
+          CLEAN_DB_PASS=$(printf "%s" "${{ secrets.DB_PASSWORD }}" | tr -d '\n' | tr -d '\r')
+          terraform apply -auto-approve \
+            -var-file="envs/${{ needs.plan.outputs.tf_env }}.tfvars" \
+            -var="db_password=$CLEAN_DB_PASS"
+
+      - name: Show outputs
+        working-directory: infra
+        run: terraform output -json
