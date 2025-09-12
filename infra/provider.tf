@@ -12,6 +12,5 @@ terraform {
 }
 
 provider "aws" {
-  region  = var.aws_region      
-  profile = "AnhKT4"            # AWS profile configured locally
+  region  = var.aws_region                  # AWS profile configured locally
 }
