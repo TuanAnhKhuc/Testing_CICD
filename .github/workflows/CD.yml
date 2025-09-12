@@ -17,7 +17,7 @@ jobs:
   # === Job 1: Terraform Plan ===
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'uat' && 'uat' || 'dev' }}
+    environment: ${{ github.ref_name == 'main' && 'main' || github.ref_name == 'uat' && 'uat' || 'dev' }}
 
     steps:
       - name: Checkout
@@ -30,7 +30,7 @@ jobs:
           case "${GITHUB_REF_NAME}" in
             dev)  echo "TF_ENV=dev"  >> "$GITHUB_ENV" ;;
             uat)  echo "TF_ENV=uat"  >> "$GITHUB_ENV" ;;
-            main) echo "TF_ENV=prod" >> "$GITHUB_ENV" ;;
+            main) echo "TF_ENV=main" >> "$GITHUB_ENV" ;;
             *)    echo "Unsupported branch: ${GITHUB_REF_NAME}"; exit 1 ;;
           esac
           echo "Selected TF_ENV=$TF_ENV"
