@@ -4,7 +4,7 @@ aws_region        = "ap-northeast-1"
 
 # ====== DNS / CERT (Route53 hosted zone phải tồn tại trước) ======
 root_domain_name  = "tudaolw.io.vn"
-subdomain         = "app"   # => app.tudaolw.io.vn
+subdomain         = "app.anhkt"   # => app.tudaolw.io.vn
 
 # ====== NETWORKING ======
 vpc_cidr = "10.0.0.0/16"
